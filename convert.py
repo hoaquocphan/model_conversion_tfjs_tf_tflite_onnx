@@ -9,6 +9,7 @@ import tflite2onnx
 import numpy as np
 import onnxruntime
 import argparse
+import os
 from posenet_factory import load_model
 
 tf.compat.v1.disable_eager_execution()
@@ -32,8 +33,8 @@ def test_onnx(input_model_file, input_tensor_size):
     input_name = session.get_inputs()[0].name
     
     raw_result = session.run([], {input_name: input_data})
-    #print(raw_result)
-    #print ("ONNX model file is valid\n")
+    print(raw_result)
+    print ("ONNX model file is valid\n")
 def convert_pb2tflite(model_name, savedmodel_path, input_tensor_size, output_stride):
     model = tf.saved_model.load(savedmodel_path)
     concrete_func = model.signatures[
@@ -59,6 +60,17 @@ def convert_tflite2onnx(input_model_file, input_tensor_size):
     test_onnx(onnx_path, input_tensor_size)
     print("Convert TFLite to ONNX successfully\n")
     return onnx_path
+def convert_pb2onnx(model_name, savedmodel_path, output_stride):
+    export_model_file = savedmodel_path + '/' + model_name + '_stride' + str(output_stride) \
+    + '.onnx'
+    cmd_line = 'python -m tf2onnx.convert --saved-model '
+    cmd_line +=  savedmodel_path
+    #cmd_line += ' --inputs-as-nchw  sub_2:0 --output '
+    cmd_line += '  --output '
+    cmd_line += export_model_file
+    print('cmd_line is ', cmd_line)
+    os.system(cmd_line)
+    return export_model_file
 
 def test_tflite(input_model_file):
     # Load the TFLite model and allocate tensors.
@@ -99,35 +111,60 @@ def check_input_tensor_size(input_tensor_size, output_stride):
     return int(input_width)   
 def main(): 
     if args.hint == True:
+        print("Use case for this conversion script is described as below:")
         print("========================================================================")
-        print("- Use case for this conversion script is described as below:")
+        print("Usage for mobilenet:")
+        print("===================")
         print("model = 'mobilenet'; stride = 8 or 16; tensor_size = 1 x 3 x XYZ x XYZ")
         print("with condition is stride value divides XYZ")
         print("- Command is used")
-        print("Ex: python convert.py --model mobilenet --stride 8 --tensor_size 198147")
+        print("Ex: python3 convert.py --model mobilenet --stride 16 --tensor_size 49923")
+        print("Ex: python3 convert.py --model mobilenet --stride 16 --tensor_size 198147")
+        print("Ex: python3 convert.py --model mobilenet --stride 16 --tensor_size 789507")
+        print("========================================================================")
+        print("Usage for resnet:")
+        print("=================")
+        print("model = 'resnet50'; stride = 32")
+        print("- Command is used")
+        print("python convert.py --model resnet50 --stride 32")
         print("========================================================================")
         return 0
 
-    if (model_name != "mobilenet"):
-        print("Model architecture only support mobilenet")
-        return -1
+
+
     if (check_input_tensor_size(input_tensor_size, output_stride) < 0):
         return -1
-
+    if (model_name == "resnet50") & (output_stride != 32):
+        print("Only support resnet50 with output stride 32")
+        return -1
     #Load saved model from tfjs
-    savedmodel_path = load_model(model_name, output_stride)
+    savedmodel_path = load_model(model_name, output_stride)    
 
-    #Convert saved model to TFLite
-    tflite_model_file = convert_pb2tflite(model_name, savedmodel_path, input_tensor_size, output_stride)
+    if (model_name == "mobilenet"):
 
-    #Convert TFLite to ONNX
-    onnx_model_file = convert_tflite2onnx(tflite_model_file, input_tensor_size)
 
+        #Convert saved model to TFLite
+        tflite_model_file = convert_pb2tflite(model_name, savedmodel_path, input_tensor_size, output_stride)
+
+        #Convert TFLite to ONNX
+        onnx_model_file = convert_tflite2onnx(tflite_model_file, input_tensor_size)
+
+    elif (model_name == "resnet50"):
+        print("Warning: resnet50 is converted with dynamic shape")
+        print("input tensor size does not affect")
+        onnx_model_file = convert_pb2onnx(model_name, savedmodel_path, output_stride)
+    else:
+        print("Model architecture only supports mobilenet, resnet50")
     print("SUMMARY")
     print("============================")
     print("savedmodel converted path  :", savedmodel_path)
-    print("TFLite model converted path:", tflite_model_file)
+    #if (model_name == "mobilenet"):
+    #    print("TFLite model converted path:", tflite_model_file)
     print("ONNX model converted path  :", onnx_model_file)
+
+    print("test ONNX model after converting")
+    #test_onnx(onnx_model_file, 198147)
+    test_onnx(onnx_model_file, 789507)
 
 if __name__ == "__main__":
     main()
