@@ -108,7 +108,39 @@ def check_input_tensor_size(input_tensor_size, output_stride):
         print ("model input size not supported\n")
         print ("It should be: output stride x n (integer) \n")
         return -1
-    return int(input_width)   
+    return int(input_width) 
+
+def load_tflite():
+    # Load the TFLite model and allocate tensors.
+    interpreter = tf.lite.Interpreter(model_path="_tf_models/posenet/mobilenet_float_100/stride32/posenet_mobilenet_v1_100_257x257_multi_kpt_stripped.tflite")
+    interpreter.allocate_tensors()
+    # Get input and output tensors.
+    input_details = interpreter.get_input_details()
+    output_details = interpreter.get_output_details()
+    print('input_details: {}'.format(input_details[0]['shape']))
+    print('output_details: {}'.format(output_details[0]['shape']))
+    print('output_details: {}'.format(output_details[1]['shape']))
+    print('output_details: {}'.format(output_details[2]['shape']))
+    print('output_details: {}'.format(output_details[3]['shape']))
+    print('output_details: {}'.format(output_details[0]['name']))
+    # Test the model on random input data.
+    input_shape = input_details[0]['shape']
+    input_data = np.array(np.random.random_sample(input_shape), dtype=np.float32)
+    interpreter.set_tensor(input_details[0]['index'], input_data)
+
+    interpreter.invoke()
+    # The function `get_tensor()` returns a copy of the tensor data.
+    # Use `tensor()` in order to get a pointer to the tensor.
+    output_data1 = interpreter.get_tensor(output_details[0]['index'])
+    output_data2 = interpreter.get_tensor(output_details[1]['index'])
+    output_data3 = interpreter.get_tensor(output_details[2]['index'])
+    output_data4 = interpreter.get_tensor(output_details[3]['index'])
+    
+    print(output_data1)
+    print(output_data2)
+    print(output_data3)
+    print(output_data4)
+
 def main(): 
     if args.hint == True:
         print("Use case for this conversion script is described as below:")
@@ -130,8 +162,6 @@ def main():
         print("========================================================================")
         return 0
 
-
-
     if (check_input_tensor_size(input_tensor_size, output_stride) < 0):
         return -1
     if (model_name == "resnet50") & (output_stride != 32):
@@ -141,7 +171,6 @@ def main():
     savedmodel_path = load_model(model_name, output_stride)    
 
     if (model_name == "mobilenet"):
-
 
         #Convert saved model to TFLite
         tflite_model_file = convert_pb2tflite(model_name, savedmodel_path, input_tensor_size, output_stride)

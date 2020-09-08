@@ -13,11 +13,13 @@ def load_model(model, stride, quant_bytes=4, multiplier=1.0):
         print('Loading MobileNet model')
 
     model_path = model_cfg['tf_dir']
+    
     if not os.path.exists(model_path):
         print('Cannot find tf model path %s, converting from tfjs...' % model_path)
         tfjs2tf.convert(model_cfg)
         assert os.path.exists(model_path)
 
+    #print('model_path: {}'.format(model_path))
     loaded_model = tf.saved_model.load(model_path)
 
     signature_key = tf.compat.v1.saved_model.signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY
